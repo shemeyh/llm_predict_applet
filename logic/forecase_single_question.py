@@ -73,4 +73,4 @@ async def forecast_single_question(
     filename = strip_title_to_filename(title)
     await build_and_write_json(filename, final_json, is_woc)
 
-    return final_result, summarization
+    return final_json
