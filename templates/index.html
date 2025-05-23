@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Agent Forecasting System</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        textarea, input[type="password"], input[type="text"] {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover { background-color: #0056b3; }
+        #results-section { margin-top: 20px; padding-top: 10px; border-top: 1px solid #eee; }
+        #results-section h2 { color: #333; margin-bottom: 10px; }
+        .result-subsection { background-color: #f9f9f9; padding: 15px; border-radius: 4px; margin-bottom: 10px; }
+        .result-subsection h3 { margin-top: 0; color: #555; }
+        pre { white-space: pre-wrap; word-wrap: break-word; background-color: #eee; padding: 10px; border-radius: 4px; }
+        #loading-indicator { text-align: center; margin: 20px 0; font-size: 18px; color: #007bff; display: none; }
+        #error-message {
+            background-color: #ffebee; /* Light red */
+            color: #c62828; /* Dark red */
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            border: 1px solid #ef9a9a; /* Lighter red border */
+            display: none; /* Hidden by default */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Forecast Input</h1>
+        <form id="forecast-form">
+            <div>
+                <label for="question">Question:</label>
+                <textarea id="question" name="question" rows="3" required></textarea>
+            </div>
+            <div>
+                <label for="resolution_criteria">Resolution Criteria:</label>
+                <textarea id="resolution_criteria" name="resolution_criteria" rows="5" required></textarea>
+            </div>
+            <div>
+                <label for="news">News (Optional):</label>
+                <textarea id="news" name="news" rows="7"></textarea>
+            </div>
+            <div>
+                <label for="openai_api_key">OpenAI API Key:</label>
+                <input type="password" id="openai_api_key" name="openai_api_key" required>
+            </div>
+            <button type="submit">Get Forecast</button>
+        </form>
+
+        <div id="loading-indicator">Loading...</div>
+        <div id="error-message"></div>
+
+        <div id="results-section" style="display: none;">
+            <h2>Forecast Results</h2>
+            <div id="phase1-reasoning" class="result-subsection">
+                <h3>Phase I: Initial Reasoning</h3>
+                <pre></pre>
+            </div>
+            <div id="phase2-group-chat" class="result-subsection">
+                <h3>Phase II: Group Chat</h3>
+                <pre></pre>
+            </div>
+            <div id="phase3-revisions" class="result-subsection">
+                <h3>Phase III: Revisions</h3>
+                <pre></pre>
+            </div>
+            <div id="formatted-summary" class="result-subsection">
+                <h3>Formatted Summary</h3>
+                <pre></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('forecast-form').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const resultsSection = document.getElementById('results-section');
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const errorMessageDiv = document.getElementById('error-message');
+            
+            // Clear previous results and errors, hide sections
+            resultsSection.style.display = 'none';
+            errorMessageDiv.style.display = 'none';
+            errorMessageDiv.textContent = '';
+            document.getElementById('phase1-reasoning').querySelector('pre').textContent = '';
+            document.getElementById('phase2-group-chat').querySelector('pre').textContent = '';
+            document.getElementById('phase3-revisions').querySelector('pre').textContent = '';
+            document.getElementById('formatted-summary').querySelector('pre').textContent = '';
+
+            loadingIndicator.style.display = 'block'; // Show loading indicator
+
+            const formData = {
+                question: document.getElementById('question').value,
+                resolution_criteria: document.getElementById('resolution_criteria').value,
+                news: document.getElementById('news').value,
+                openai_api_key: document.getElementById('openai_api_key').value
+            };
+
+            try {
+                const response = await fetch('/forecast', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                if (!response.ok) {
+                    let errorText = `Error ${response.status}: ${response.statusText}`;
+                    try {
+                        const errorData = await response.json();
+                        errorText += `\nDetails: ${errorData.error || 'Unknown server error.'}`;
+                        if (errorData.details) {
+                             errorText += `\n${errorData.details}`;
+                        }
+                    } catch (e) {
+                        // If response is not JSON, use the text directly
+                        errorText += `\nCould not parse error details.`;
+                    }
+                    throw new Error(errorText);
+                }
+
+                const results = await response.json();
+                resultsSection.style.display = 'block'; // Show results section
+
+                // Display results
+                document.getElementById('phase1-reasoning').querySelector('pre').textContent = results.phase_1_reasoning ? JSON.stringify(results.phase_1_reasoning, null, 2) : 'N/A';
+                document.getElementById('phase2-group-chat').querySelector('pre').textContent = results.phase_2_group_chat ? JSON.stringify(results.phase_2_group_chat, null, 2) : 'N/A';
+                document.getElementById('phase3-revisions').querySelector('pre').textContent = results.phase_3_revisions ? JSON.stringify(results.phase_3_revisions, null, 2) : 'N/A';
+                
+                if(results.formatted_summary) {
+                     document.getElementById('formatted-summary').querySelector('pre').textContent = results.formatted_summary;
+                } else if (results.error) { // Handle cases where the backend returns a successful status code but with an error message in JSON
+                    errorMessageDiv.textContent = `Error: ${results.error}\n${results.details || ''}`;
+                    errorMessageDiv.style.display = 'block';
+                }
+                 else {
+                    document.getElementById('formatted-summary').querySelector('pre').textContent = JSON.stringify(results, null, 2);
+                }
+
+            } catch (error) {
+                errorMessageDiv.textContent = error.message || 'An unexpected error occurred. Please check the console.';
+                errorMessageDiv.style.display = 'block';
+            } finally {
+                loadingIndicator.style.display = 'none'; // Hide loading indicator
+            }
+        });
+    </script>
+</body>
+</html>
